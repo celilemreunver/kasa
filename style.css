@@ -5,6 +5,7 @@ main{max-width:720px;margin:0 auto;padding:40px 16px 80px}
 h1{font-size:28px;margin:0 0 4px}
 h2{font-size:19px;margin:32px 0 8px;color:var(--brand)}
 p,li{color:var(--muted)}
+.card ul{margin:8px 0;padding-left:20px}
 strong{color:var(--text)}
 a{color:var(--brand)}
 .logo{display:inline-flex;align-items:center;gap:10px;font-weight:700;font-size:20px;margin-bottom:24px}
