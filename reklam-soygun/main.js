@@ -78,14 +78,25 @@ function vaultDoor(cx, cy, r, { open = 0, shake = 0, t = 0, dialRot = 0 } = {}) 
 }
 
 // ——— hazine: telefon + defter ———
-function phoneObj(x, y, s, rot = 0, screen = C.mus) {
-  g.save(); g.translate(x, y); g.rotate(rot); g.scale(s, s);
-  piece(P('phB', () => smooth(rectP(-62, -118, 124, 236), 1), 71, 1.2), C.ink);
-  piece(P('phS', () => rectP(-50, -100, 100, 196), 72, 1), screen, { gap: 0, shadow: false });
-  // ekranda kasa simgesi
-  piece(P('phI', () => smooth(rectP(-26, -34, 52, 52), 1), 73, .8), C.ink, { gap: 0, shadow: false });
-  piece(circP(-6, -8, 9, 12), C.mus, { gap: 0, shadow: false });
+// gerçekçi telefon: gövde, metal kenar, yan tuşlar, durum çubuğu, dinamik ada, cam yansıması; ekranda uygulama
+function realPhone(cx, cy, w, img, { rot = 0, top = 0, zoom = 1, overlay = null } = {}) {
+  const sb = w * .11, sw = w, sh = w * 1304 / 640 * .94 + sb, bz = w * .045, bw = sw + bz * 2, bh = sh + bz * 2, r = w * .14;
+  g.save(); g.translate(cx, cy); g.rotate(rot);
+  g.save(); g.shadowColor = 'rgba(20,12,6,.5)'; g.shadowBlur = 20; g.shadowOffsetX = 6; g.shadowOffsetY = 12;
+  g.fillStyle = '#0c0c0f'; g.beginPath(); g.roundRect(-bw / 2, -bh / 2, bw, bh, r + bz); g.fill(); g.restore();
+  g.strokeStyle = '#6a6470'; g.lineWidth = R.max(2, w * .009); g.beginPath(); g.roundRect(-bw / 2, -bh / 2, bw, bh, r + bz); g.stroke();
+  g.fillStyle = '#3a3840'; g.fillRect(bw / 2 - 1, -bh * .2, w * .014, bh * .12); g.fillRect(-bw / 2 - w * .013, -bh * .3, w * .014, bh * .06); g.fillRect(-bw / 2 - w * .013, -bh * .2, w * .014, bh * .1);
+  g.save(); g.beginPath(); g.roundRect(-sw / 2, -sh / 2, sw, sh, r); g.clip();
+  g.fillStyle = '#111216'; g.fillRect(-sw / 2, -sh / 2, sw, sh);
+  const k = sw / 640 * zoom;
+  if (img) { g.save(); g.beginPath(); g.rect(-sw / 2, -sh / 2 + sb, sw, sh - sb); g.clip(); g.drawImage(img, -sw / 2, -sh / 2 + sb - top * k, 640 * k, 1304 * k); if (overlay) overlay(k, -sw / 2, -sh / 2 + sb - top * k); g.restore(); }
+  g.fillStyle = '#fff'; g.font = `700 ${R.round(w * .042)}px LSpartan`; g.textBaseline = 'middle'; g.textAlign = 'left'; g.fillText('03:00', -sw / 2 + w * .09, -sh / 2 + sb * .55);
+  g.fillRect(sw / 2 - w * .16, -sh / 2 + sb * .45, w * .07, w * .03);
+  const gr = g.createLinearGradient(-sw / 2, -sh / 2, sw / 2, sh / 2); gr.addColorStop(0, 'rgba(255,255,255,.12)'); gr.addColorStop(.4, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(-sw / 2, -sh / 2, sw, sh);
   g.restore();
+  g.fillStyle = '#000'; g.beginPath(); g.roundRect(-w * .15, -sh / 2 + w * .025, w * .3, w * .075, w * .0375); g.fill();
+  g.restore();
+  return { sw, sh, bh };
 }
 function notebook(x, y, s, rot = 0) {
   g.save(); g.translate(x, y); g.rotate(rot); g.scale(s, s);
@@ -110,18 +121,21 @@ function sceneRoom(t) {   // 0 – 3: kasa odası
   const a = -1.1 + R.sin(t * 2.2) * .55;
   piece([[90, 120], [90 + R.cos(a - .16) * 2600, 120 + R.sin(a - .16) * 2600 + 1800], [90 + R.cos(a + .16) * 2600, 120 + R.sin(a + .16) * 2600 + 1800]].map(([x, y]) => [x, y]), C.redD, { gap: 0, shadow: false });
   piece(P('lamp', () => circP(90, 120, 46, 30), 81), C.red);
+  // fener ışığı: hırsızların arkasında büyük krem daire (siluetler okunsun)
+  const fl = back(clamp(t / .3), 1.4);
+  piece(P('torch', () => circP(330, 840, 400, 110), 83, 2.2).map(([x, y]) => [330 + (x - 330) * fl, 840 + (y - 840) * fl]), C.paper);
   // kasa kapısı (sağda)
-  vaultDoor(800, 1050, 230, { t });
+  vaultDoor(820, 760, 200, { t });
   // zemin
-  piece(P('floor1', () => rectP(-40, 1420, 1160, 600), 82, 2), C.inkL);
+  piece(P('floor1', () => rectP(-40, 1190, 1160, 900), 82, 2), C.inkL);
   // hırsızlar: koşarak girer, durur, gösterir
   const runU = clamp(t / ST.STOP);
-  const x1 = lerp(-260, 330, eo(runU)), x2 = lerp(-420, 130, eo(clamp((t - .1) / ST.STOP)));
+  const x1 = lerp(-260, 420, eo(runU)), x2 = lerp(-420, 190, eo(clamp((t - .1) / ST.STOP)));
   const ph = t * 2.6;
   const p1 = t < ST.STOP ? runPose(ph % 1, { lean: .3 }) : { ...AGENT_POSE.stand, shF: 2.15 + R.sin(t * 8) * .05, elF: .05, lean: .05, eyeWide: 1, tie: .2 };
   const p2 = t < ST.STOP + .1 ? runPose((ph + .5) % 1, { lean: .3 }) : { ...AGENT_POSE.stand, lean: .18, bob: 30, knF: .9, thF: .6, knB: .7, thB: -.2, shF: .9, elF: 1.2, tie: .1 };
-  agentSide(x2, 1440, 1.05, p2, { thief: true, accent: C.paper, tieCol: C.paper });
-  agentSide(x1, 1460, 1.15, p1, { thief: true, accent: C.red, tieCol: C.red });
+  agentSide(x2, 1190, 1.15, p2, { thief: true, accent: C.red, tieCol: C.red });
+  agentSide(x1, 1200, 1.25, p1, { thief: true, accent: C.red, tieCol: C.red });
   // kanca başlığı
   const hu = back(clamp(t / .35), 2);
   g.save(); g.translate(540, 300); g.scale(hu, hu); g.translate(-540, -300);
@@ -165,18 +179,19 @@ function sceneTreasure(t) { // 7 – 9.5: kasanın içi — telefon ve defter
   piece(P('shelf', () => rectP(40, 1100, 1000, 60), 102, 1.6), C.inkL);
   cutText('HAZİNE?', 540, 470, 200, C.musD, { seed: 31, ls: 6 });
   // defter rafta, telefon kalkıyor
-  notebook(330, 970, 1.0, -.05);
+  notebook(300, 900, 1.45, -.05);
   const grabbed = t >= ST.GRAB + .2;
-  if (!grabbed) phoneObj(700, 990, .95, .04);
+  if (!grabbed) realPhone(700, 845, 220, REC.a190, { rot: .05 });
   // Hırsız 2 (sağda, büyük): uzanır, telefonu alır, yüzüne kaldırır
   const reach = seg(t, ST.S3, ST.GRAB), lift = eo(seg(t, ST.GRAB + .2, ST.GRAB + .7));
-  const p = { ...AGENT_POSE.stand, lean: -.05 + reach * .2 - lift * .2, head: lift * .25, shF: lerp(.3, 1.5, eo(reach)) + lift * .9, elF: lerp(.3, .1, reach) + lift * .9, eyeWide: grabbed ? 1 : 0, tie: .1 };
-  agentSide(1000, 1700, 1.55, p, { thief: true, accent: C.paper, tieCol: C.paper, flip: true, holdPhone: grabbed });
+  const p = { ...AGENT_POSE.stand, lean: -.05 + reach * .2 - lift * .2, head: lift * .25, shF: lerp(.3, 1.5, eo(reach)) + lift * .25, elF: lerp(.3, .1, reach) + lift * 1.1, eyeWide: grabbed ? 1 : 0, tie: .1 };
+  const hand = agentSide(1000, 1700, 1.55, p, { thief: true, accent: C.paper, tieCol: C.paper, flip: true });
+  if (grabbed) { const hx = hand.wrist[0], hy = hand.wrist[1]; realPhone(lerp(700, hx - 70, eo(seg(t, ST.GRAB + .2, ST.GRAB + .45))), lerp(845, hy - 40, eo(seg(t, ST.GRAB + .2, ST.GRAB + .45))), lerp(220, 210, lift), REC.a190, { rot: lerp(.05, -.08, lift) }); }
   // Hırsız 1 kenardan bakar
   agentSide(-20, 1720, 1.4, { ...AGENT_POSE.stand, lean: .2, head: .1, eyeWide: 1, shF: .4, elF: .5 }, { thief: true, accent: C.red, tieCol: C.red });
   // soru işareti
   const q = back(seg(t, 8.05, 8.4), 2.5);
-  if (q > 0) cutText('?', 820, 640, 330 * q, C.red, { seed: 33, keyline: true });
+  if (q > 0) cutText('?', 975, 620, 230 * q, C.red, { seed: 33, keyline: true });
 }
 
 const REC = { a: [], b: [], c: [] };
@@ -191,27 +206,20 @@ async function sceneApp(t) {  // 9.5 – 17.4: uygulama
   // yan sütunlar: GELİR (hardal) / GİDER (kırmızı) — tip mimari
   cutText('GELİR', 120, 960, 230, C.musD, { rot: -R.PI / 2, seed: 41, ls: 10 });
   cutText('GİDER', 960, 960, 230, C.redD, { rot: R.PI / 2, seed: 42, ls: 10 });
-  // telefona dalış
-  const push = eo(seg(t, ST.S4, ST.S4 + .45));
-  const fw = 660, fh = fw * 1304 / 640;
-  const sc = lerp(.35, 1, push), cy = 200 + fh / 2;
-  g.save(); g.translate(540, lerp(1100, cy, push)); g.scale(sc, sc); g.rotate(lerp(.2, -.012, push));
-  piece(P('appFrame', () => smooth(rectP(-fw / 2 - 26, -fh / 2 - 26, fw + 52, fh + 52), 1), 111, 2), C.paper);
-  piece(P('appFrame2', () => rectP(-fw / 2 - 8, -fh / 2 - 8, fw + 16, fh + 16), 112, 1.2), C.ink, { gap: 0 });
-  // ekran içeriği
-  let im, zoom = 1, top = 0;   // top: kaynak resimde (640 genişlik) üste gelecek y
+  // eldeki telefondan büyüyerek ekrana dalış
+  const push = eio(seg(t, ST.S4, ST.S4 + .5));
+  let im, zoom = 1, top = 0;
   if (t < ST.SUMMARY) im = await recFrame('a', lerp(1, 190, seg(t, ST.S4 + .3, ST.SUMMARY - .1)));
   else if (t < ST.MENU) { im = await recFrame('a', 190); const u = eio(seg(t, ST.SUMMARY, ST.SUMMARY + .5)); zoom = lerp(1, 1.32, u); top = lerp(0, 60, u); }
   else if (t < ST.JOIN) im = await recFrame('b', lerp(1, 22, seg(t, ST.MENU, ST.JOIN)));
   else im = await recFrame('c', lerp(14, 54, seg(t, ST.JOIN, ST.S5 - .4)));
-  const k = fw / 640 * zoom;
-  g.save(); g.beginPath(); g.rect(-fw / 2, -fh / 2, fw, fh); g.clip();
-  g.drawImage(im, -fw / 2, -fh / 2 - top * k, 640 * k, 1304 * k);
-  const box = (sx, sy, sw, sh, a, lw = 8) => { g.globalAlpha = a; g.strokeStyle = C.mus; g.lineWidth = lw; g.beginPath(); g.roundRect(-fw / 2 + sx * k, -fh / 2 + (sy - top) * k, sw * k, sh * k, 22); g.stroke(); g.globalAlpha = 1; };
-  if (t >= ST.SUMMARY && t < ST.MENU) box(18, 190, 600, 300, env(t, ST.SUMMARY + .45, ST.MENU));
-  if (t >= ST.MENU + .3 && t < ST.JOIN) box(6, 586, 330, 46, env(t, ST.MENU + .3, ST.JOIN, .15, .1), 7);
-  g.restore();
-  g.restore();
+  const W0 = 620, w = lerp(200, W0, push), cx = lerp(800, 540, push), cy = lerp(640, 1000, push);
+  const overlay = (k, x0, y0) => {
+    const box = (sx, sy, sw, sh, a, lw = 8) => { if (a <= 0) return; g.globalAlpha = a; g.strokeStyle = C.mus; g.lineWidth = lw; g.beginPath(); g.roundRect(x0 + sx * k, y0 + sy * k, sw * k, sh * k, 22); g.stroke(); g.globalAlpha = 1; };
+    if (t >= ST.SUMMARY && t < ST.MENU) box(18, 190, 600, 300, env(t, ST.SUMMARY + .45, ST.MENU));
+    if (t >= ST.MENU + .3 && t < ST.JOIN) box(6, 586, 330, 46, env(t, ST.MENU + .3, ST.JOIN, .15, .1), 7);
+  };
+  realPhone(cx, cy, w, im, { rot: lerp(-.08, 0, push), top, zoom, overlay });
 }
 const env = (t, a, b, fi = .25, fo = .25) => R.max(0, R.min(seg(t, a, a + fi), 1 - seg(t, b - fo, b)));
 
@@ -227,7 +235,8 @@ function sceneHero(t) {   // 17.4 – 21: gerçek hazine
   const p1 = run > 0 ? runPose(ph % 1, { lean: .32 }) : { ...AGENT_POSE.stand, shF: 2.95, elF: .05, lean: -.05, head: -.35, eyeWide: 1, tie: .3 + R.sin(t * 5) * .1, tph: t * 4 };
   const p2 = run > 0 ? runPose((ph + .5) % 1, { lean: .32 }) : { ...AGENT_POSE.stand, shF: 2.4, elF: .4, shB: 2.6, elB: .3, lean: -.08, head: -.3, eyeWide: 1, bob: -18 * R.abs(R.sin(t * R.PI * 2)) };
   agentSide(300 + xo, 1420, 1.2, p2, { thief: true, accent: C.paper, tieCol: C.paper });
-  agentSide(640 + xo, 1440, 1.3, p1, { thief: true, accent: C.red, tieCol: C.red, holdPhone: true });
+  const hh = agentSide(640 + xo, 1440, 1.3, p1, { thief: true, accent: C.red, tieCol: C.red });
+  realPhone(hh.wrist[0] + 8, hh.wrist[1] - 110, 120, REC.a190, { rot: .05 });
 }
 
 function kasaIcon(cx, cy, size) {
@@ -251,8 +260,8 @@ function sceneEnd(t) {    // 21 – 25: kapanış kartı
   const d = t - ST.S6;
   const u = back(seg(d, 0, .4), 1.8);
   g.save(); g.translate(540, 560); g.scale(u, u); g.translate(-540, -560);
-  piece(P('icBack', () => smooth(rectP(330, 350, 420, 420), 1), 131, 2), C.mus);
-  kasaIcon(540, 560, 380);
+  piece(P('icBack', () => smooth(rectP(318, 338, 444, 444), 2), 131, 2), C.mus);
+  g.save(); g.shadowColor = 'rgba(20,12,6,.45)'; g.shadowBlur = 18; g.shadowOffsetY = 10; g.drawImage(LOGO, 540 - 200, 560 - 200, 400, 400); g.restore();
   g.restore();
   const a1 = back(seg(d, .2, .5), 2), a2 = back(seg(d, .45, .75), 2), a3 = back(seg(d, .7, 1.05), 2);
   if (a1 > 0) { g.save(); g.translate(540, 930); g.scale(a1, a1); g.translate(-540, -930); cutText('KASA DEFTERİ', 540, 960, 170, C.paper, { seed: 61, ls: 4 }); g.restore(); }
@@ -269,6 +278,7 @@ function sceneEnd(t) {    // 21 – 25: kapanış kartı
 // ——— ana çizim ———
 await document.fonts.ready;
 for (const f of ['100px LGothic', '600 40px LSpartan', '800 40px LSpartan']) await document.fonts.load(f, 'şğİıçöüŞĞÇÖÜ');
+const LOGO = await new Promise(r => { const im = new Image(); im.onload = () => r(im); im.src = 'img/logo.png'; });
 for (const [s, n] of [['a', 190], ['b', 22], ['c', 54]]) for (let i = 1; i <= n; i += 1) await recFrame(s, i);
 
 function subAt(t) { return ST.SUBS.find(s => t >= s[0] && t < s[1]); }
